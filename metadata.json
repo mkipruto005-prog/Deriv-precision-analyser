@@ -1,0 +1,6 @@
+{
+  "name": "Deriv Precision Analyzer",
+  "description": "High-accuracy algorithmic analysis tool for Deriv synthetic indices with real-time tick streaming, multi-market volatility scanner, 95%+ Even/Odd parity reversion predictor, Under 8 safe haven, and automated DBot XML export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
