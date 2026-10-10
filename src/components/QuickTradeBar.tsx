@@ -7,7 +7,8 @@ import {
   DollarSign, 
   Clock, 
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Layers
 } from 'lucide-react';
 import { DerivSymbol, PrecisionSignal } from '../types';
 import { CONTRACT_INFO } from '../constants/symbols';
@@ -39,6 +40,7 @@ export interface QuickTradeBarProps {
   onOpenMatchesTool?: () => void;
   isAutoStrikeArmed?: boolean;
   onToggleAutoStrike?: (armed: boolean) => void;
+  onNavigateToBulk?: () => void;
 }
 
 export const QuickTradeBar: React.FC<QuickTradeBarProps> = ({
@@ -62,7 +64,8 @@ export const QuickTradeBar: React.FC<QuickTradeBarProps> = ({
   topMatchAccuracy = 96.2,
   onOpenMatchesTool,
   isAutoStrikeArmed = false,
-  onToggleAutoStrike
+  onToggleAutoStrike,
+  onNavigateToBulk
 }) => {
   const activeSymbol = currentSymbol || symbol;
   const isTradeDisabled = disabled || Boolean(pendingTrade);
@@ -141,6 +144,17 @@ export const QuickTradeBar: React.FC<QuickTradeBarProps> = ({
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
               <span>{isAutoStrikeArmed ? 'AUTO-STRIKE: ARMED' : 'AUTO-STRIKE'}</span>
+            </button>
+          )}
+
+          {onNavigateToBulk && (
+            <button
+              onClick={onNavigateToBulk}
+              className="ml-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/60 shadow-sm"
+              title="Open Bulk Trading Suite: Multi-Contract Batches & Baskets"
+            >
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              <span>BULK BATCH</span>
             </button>
           )}
         </div>

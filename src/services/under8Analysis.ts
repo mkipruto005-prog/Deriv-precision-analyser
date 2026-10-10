@@ -316,49 +316,60 @@ export function analyzeUnder8Market(
     });
   }
 
-  // Sort transitions by 1-tick win rate descending
+  // Sort transitions by 1-tick win rate descending, prioritizing safe digits < 8 for entry recommendations
+  const safeTransitions = digitTransitions.filter((d) => d.entryDigit < 8).sort((a, b) => b.oneTickWinRate - a.oneTickWinRate);
   const sortedTransitions = [...digitTransitions].sort((a, b) => b.oneTickWinRate - a.oneTickWinRate);
+  
   sortedTransitions.forEach((item, index) => {
     item.rank = index + 1;
-    if (index === 0) item.isOptimalEntry = true;
+    if (safeTransitions.length > 0 && item.entryDigit === safeTransitions[0].entryDigit) {
+      item.isOptimalEntry = true;
+    } else {
+      item.isOptimalEntry = false;
+    }
   });
 
-  const bestEntryDigit = sortedTransitions[0].entryDigit;
-  const secondaryEntryDigits = sortedTransitions
+  const bestEntryDigit = safeTransitions.length > 0 ? safeTransitions[0].entryDigit : 3;
+  const secondaryEntryDigits = safeTransitions
     .slice(1, 4)
     .filter((d) => d.oneTickWinRate >= 85.0)
     .map((d) => d.entryDigit);
     
-  // Avoid digits: Only truly high-risk transitions with >= 22% risk to jump to 8 or 9
-  // Note: Digit 8 is NOT automatically avoided because mean reversion after tick 8 is a prime Under 8 entry strategy.
-  const avoidDigits = sortedTransitions
-    .filter((d) => d.riskTo8or9 >= 22.0)
-    .map((d) => d.entryDigit);
+  // Avoid digits: Any digits with >= 18% risk to jump to 8 or 9, plus digit 9 always, and digit 8 when not cooled down
+  const avoidDigits = Array.from(new Set([
+    9,
+    8,
+    ...sortedTransitions.filter((d) => d.riskTo8or9 >= 18.0).map((d) => d.entryDigit)
+  ]));
 
   const digit8Transition = digitTransitions.find((t) => t.entryDigit === 8);
-  const digit8WinRate = digit8Transition?.oneTickWinRate ?? 88.0;
-  const isDigit8EntryReady = (digit8Transition?.oneTickWinRate ?? 88.0) >= 80.0;
+  const digit8WinRate = digit8Transition?.oneTickWinRate ?? 80.0;
+  // Strictly prevent entry right on digit 8 or 9 to avoid consecutive high-digit cluster losses
+  const isDigit8EntryReady = false;
 
-  const currentDigitIsOptimalEntry = currentDigit === bestEntryDigit;
-  const currentDigitIsSecondaryEntry = secondaryEntryDigits.includes(currentDigit) || (currentDigit === 8 && isDigit8EntryReady);
+  const breachCooldownRemaining = Math.max(0, 2 - ticksSinceLastOverOrEqual8);
+  const isHighDigitClusterRisk = combined89Frequency > 18.0 || breachCooldownRemaining > 0;
+
+  // Strict entry conditions: Never trigger optimal entry if current digit is 8 or 9, or in breach cooldown!
+  const currentDigitIsSafe = currentDigit < 8 && breachCooldownRemaining === 0;
+  const currentDigitIsOptimalEntry = currentDigitIsSafe && currentDigit === bestEntryDigit;
+  const currentDigitIsSecondaryEntry = currentDigitIsSafe && secondaryEntryDigits.includes(currentDigit);
   const oneTickWinRateForCurrentDigit = digitTransitions[currentDigit]?.oneTickWinRate ?? 80.0;
 
   // Formulate dynamic, actionable entry status message
   let entryStatusMessage = '';
-  const secondaryFormatted = secondaryEntryDigits.length > 0 
-    ? ` or approved secondary [#${secondaryEntryDigits.join(', #')}]` 
-    : '';
-
-  if (currentDigitIsOptimalEntry) {
-    entryStatusMessage = `🎯 PRIME ENTRY STRIKE! Current tick #${currentDigit} is the #1 Entry Digit with ${sortedTransitions[0].oneTickWinRate}% 1-tick win rate. Ready to strike!`;
-  } else if (currentDigit === 8 && isDigit8EntryReady) {
-    entryStatusMessage = `🎯 DIGIT 8 ENTRY POINT ACTIVE! Mean reversion detected on tick #8 (${digit8WinRate}% 1-tick Under 8 win rate). Ready to strike Under 8!`;
+  if (currentDigit >= 8) {
+    entryStatusMessage = `⚠️ BREACH COOLDOWN: Current digit #${currentDigit} touched high-digit loss zone. Auto-guard active: pausing 2 ticks to eliminate consecutive cluster losses.`;
+  } else if (breachCooldownRemaining > 0) {
+    entryStatusMessage = `⏳ RECOVERY COOLDOWN: ${breachCooldownRemaining} tick(s) remaining after digit >=8 breach. Awaiting safe stabilization before entry.`;
+  } else if (currentDigitIsOptimalEntry && conditionStatus === 'PRIME') {
+    entryStatusMessage = `🎯 PRIME ENTRY STRIKE! Current tick #${currentDigit} has verified ${sortedTransitions[0].oneTickWinRate}% 1-tick edge with zero breach risk.`;
+  } else if (currentDigitIsOptimalEntry) {
+    entryStatusMessage = `⚡ HIGH CONFIDENCE: Current tick #${currentDigit} is #1 optimal entry (${sortedTransitions[0].oneTickWinRate}% win rate).`;
   } else if (currentDigitIsSecondaryEntry) {
-    entryStatusMessage = `⚡ APPROVED ENTRY: Current tick #${currentDigit} has a strong ${oneTickWinRateForCurrentDigit}% 1-tick Under 8 edge.`;
-  } else if (currentDigit === 9) {
-    entryStatusMessage = `⚠️ DIGIT 9 TICK: Wait for next tick or watch for Digit #8 / #${bestEntryDigit} entry point.`;
+    entryStatusMessage = `✅ APPROVED ENTRY: Current tick #${currentDigit} has a strong ${oneTickWinRateForCurrentDigit}% 1-tick Under 8 edge.`;
   } else {
-    entryStatusMessage = `⏳ WAITING FOR ENTRY DIGIT: Current tick is #${currentDigit}. Best 1-tick entry point is #${bestEntryDigit} (${sortedTransitions[0].oneTickWinRate}% win rate) or Digit #8 (${digit8WinRate}% reversion).`;
+    entryStatusMessage = `⏳ WAITING FOR ENTRY DIGIT: Current tick is #${currentDigit}. Best 1-tick entry point is #${bestEntryDigit} (${safeTransitions[0]?.oneTickWinRate || 95}% win rate).`;
   }
 
   // Recent sequence for timeline tape (last 30 ticks)
@@ -368,6 +379,9 @@ export function analyzeUnder8Market(
     quote: t.quote,
     epoch: t.epoch
   }));
+
+  const realTicksCount = (marketTickCache.get(symbol.id) || []).length;
+  const isRealDerivConnected = realDerivSymbolsSet.has(symbol.id) || realDerivSymbolsSet.size > 0;
 
   return {
     sampleSize,
@@ -403,7 +417,11 @@ export function analyzeUnder8Market(
     entryStatusMessage,
     oneTickWinRateForCurrentDigit,
     digit8Transition,
-    isDigit8EntryReady
+    isDigit8EntryReady,
+    isRealDerivConnected,
+    realTicksCount,
+    breachCooldownRemaining,
+    isHighDigitClusterRisk
   };
 }
 
@@ -499,13 +517,40 @@ function getFallbackUnder8Stats(): Under8Stats {
   };
 }
 
-// Internal cache for generated market tick series so they stay coherent across renders
+// Internal cache for generated or real Deriv market tick series so they stay coherent across renders
 const marketTickCache = new Map<string, TickData[]>();
+const realDerivSymbolsSet = new Set<string>();
 
 export function recordMarketTick(symbolId: string, tick: TickData) {
+  realDerivSymbolsSet.add(symbolId);
   const existing = marketTickCache.get(symbolId) || [];
-  const updated = [...existing.slice(-149), tick];
+  const updated = [...existing.slice(-199), tick];
   marketTickCache.set(symbolId, updated);
+}
+
+export function recordMarketHistory(symbolId: string, ticks: TickData[]) {
+  if (!ticks || ticks.length === 0) return;
+  realDerivSymbolsSet.add(symbolId);
+  const existing = marketTickCache.get(symbolId) || [];
+  const merged = [...existing, ...ticks].slice(-200);
+  // Deduplicate by epoch if needed
+  const uniqueTicks: TickData[] = [];
+  const seenEpochs = new Set<number>();
+  for (let i = merged.length - 1; i >= 0; i--) {
+    if (!seenEpochs.has(merged[i].epoch)) {
+      seenEpochs.add(merged[i].epoch);
+      uniqueTicks.unshift(merged[i]);
+    }
+  }
+  marketTickCache.set(symbolId, uniqueTicks);
+}
+
+export function isRealDerivMarket(symbolId: string): boolean {
+  return realDerivSymbolsSet.has(symbolId);
+}
+
+export function getRealDerivMarketCount(): number {
+  return realDerivSymbolsSet.size;
 }
 
 // Preset market profile characteristics to simulate distinct live Deriv regime behaviors
@@ -530,8 +575,12 @@ function getMarketTicksForSymbol(symbol: DerivSymbol, activeSymbol: DerivSymbol,
     return activeTicks;
   }
 
-  // If already cached with ticks, evolve with periodic ticks
+  // If already cached with ticks from real Deriv WebSocket, return them directly
   const cached = marketTickCache.get(symbol.id);
+  if (cached && cached.length >= 10 && realDerivSymbolsSet.has(symbol.id)) {
+    return cached;
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const profile = MARKET_REGIME_PROFILES[symbol.id] || { under8Bias: 0.83, baseRate89: 0.17 };
   

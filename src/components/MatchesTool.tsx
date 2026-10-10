@@ -58,6 +58,8 @@ interface MatchesToolProps {
   latencyMs?: number;
   derivTelemetry?: DerivTelemetry;
   onReconnectDeriv?: () => void;
+  isAutoStrikeArmed?: boolean;
+  onToggleAutoStrike?: (armed: boolean) => void;
 }
 
 export const MatchesTool: React.FC<MatchesToolProps> = ({
@@ -74,12 +76,14 @@ export const MatchesTool: React.FC<MatchesToolProps> = ({
   connectionStatus = 'CONNECTED',
   latencyMs = 24,
   derivTelemetry,
-  onReconnectDeriv
+  onReconnectDeriv,
+  isAutoStrikeArmed = false,
+  onToggleAutoStrike
 }) => {
   const [stakeAmount, setStakeAmount] = useState<number>(2);
   const [selectedDigitOverride, setSelectedDigitOverride] = useState<number | null>(null);
   const [windowSize, setWindowSize] = useState<number>(100);
-  const [showMechanicsExplainer, setShowMechanicsExplainer] = useState<boolean>(true);
+  const [showMechanicsExplainer, setShowMechanicsExplainer] = useState<boolean>(false);
 
   // Automatically reset any manual digit lock when changing symbol so it follows the top target
   useEffect(() => {
@@ -184,6 +188,8 @@ export const MatchesTool: React.FC<MatchesToolProps> = ({
         latencyMs={latencyMs}
         derivTelemetry={derivTelemetry}
         onReconnectDeriv={onReconnectDeriv}
+        isAutoStrikeArmed={isAutoStrikeArmed}
+        onToggleAutoStrike={onToggleAutoStrike}
       />
 
       {/* Deriv Matches Mechanics & Mathematical Truth Banner */}
@@ -215,13 +221,31 @@ export const MatchesTool: React.FC<MatchesToolProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={() => setShowMechanicsExplainer(prev => !prev)}
-            className="text-xs font-mono text-purple-300 hover:text-purple-200 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-900/30 border border-purple-700/40 transition-colors"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>{showMechanicsExplainer ? 'Hide Mechanics' : 'How Matches Actually Works'}</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {onToggleAutoStrike && (
+              <button
+                type="button"
+                onClick={() => onToggleAutoStrike(!isAutoStrikeArmed)}
+                className={`text-xs font-mono font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all shadow-sm ${
+                  isAutoStrikeArmed
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/30 animate-pulse'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+                title="Automatically strike 809% Match contracts whenever positive EV mathematical edge aligns"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>{isAutoStrikeArmed ? 'AUTO-STRIKE: ARMED' : 'ARM AUTO-STRIKE'}</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowMechanicsExplainer(prev => !prev)}
+              className="text-xs font-mono text-purple-300 hover:text-purple-200 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-900/30 border border-purple-700/40 transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>{showMechanicsExplainer ? 'Hide Mechanics' : 'How Matches Actually Works'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Real Deriv Mechanics Breakdown */}
@@ -320,7 +344,7 @@ export const MatchesTool: React.FC<MatchesToolProps> = ({
               <span className="font-bold">
                 {lastMatchTrade.outcome === 'WIN' ? '🎉 WIN (+809% Payout)!' : 'Last Trade Resolved:'}
               </span>{' '}
-              Target was <strong className="text-white">#{lastMatchTrade.target}</strong>, exit digit was <strong className="text-white">#{lastMatchTrade.exitDigit}</strong>.{' '}
+              Target was <strong className="text-white">#{lastMatchTrade.target.replace('MATCHES ', '').replace('DIFFERS ', '')}</strong>, exit digit was <strong className="text-white">#{lastMatchTrade.exitDigit}</strong>.{' '}
               {lastMatchTrade.outcome === 'WIN' ? (
                 <span className="text-emerald-400 font-bold">Net Profit: +${lastMatchTrade.profit.toFixed(2)}</span>
               ) : (

@@ -21,7 +21,9 @@ import {
   Play,
   Square,
   Flame,
-  Wallet
+  Wallet,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import { 
   DerivSymbol, 
@@ -34,6 +36,8 @@ import {
   ConfluenceFactor
 } from '../types';
 import { DashboardBotConfig, DashboardBotStats } from './DashboardSniperBot';
+import { ExportCsvModal } from './ExportCsvModal';
+import { exportTradesToCSV } from '../utils/exportCsv';
 import { DERIV_SYMBOLS, CONTRACT_INFO } from '../constants/symbols';
 
 export interface DemoTradingTerminalProps {
@@ -88,6 +92,8 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
   const [targetDigit, setTargetDigit] = useState<number>(() => digitStats.coldestDigit ?? 2);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'wins' | 'losses'>('all');
   const [showBotModal, setShowBotModal] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const presetStakes = [1, 5, 10, 25, 50, 100, 250, 500];
 
@@ -139,7 +145,7 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
           winRate: 96.5,
           desc: 'Wins if exit digit is 0, 1, 2, 3, 4, 5, 6, or 7. Powered by 8-factor confluence.',
           contractType: 'DIGITUNDER' as const,
-          direction: 'UNDER',
+          direction: 'UNDER' as const,
           barrier: 8,
           duration: 1
         };
@@ -150,7 +156,7 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
           winRate: 90.9,
           desc: `Wins if exit digit is NOT ${targetDigit}. Highly resilient counter-trend shield.`,
           contractType: 'DIGITDIFF' as const,
-          direction: 'DIFFERS',
+          direction: 'DIFFERS' as const,
           predictedDigit: targetDigit,
           duration: 1
         };
@@ -161,7 +167,7 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
           winRate: 22.5,
           desc: `Wins if exit digit matches ${targetDigit} exactly. Massive 809% payout (1 win covers 8 losses).`,
           contractType: 'DIGITMATCH' as const,
-          direction: 'MATCHES',
+          direction: 'MATCHES' as const,
           predictedDigit: targetDigit,
           duration: 1
         };
@@ -172,7 +178,7 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
           winRate: 95.2,
           desc: 'Wins if exit digit is even. Evaluated with 95%+ parity momentum filter.',
           contractType: 'DIGITEVEN' as const,
-          direction: 'EVEN',
+          direction: 'EVEN' as const,
           duration: 1
         };
       case 'odd':
@@ -182,7 +188,7 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
           winRate: 95.2,
           desc: 'Wins if exit digit is odd. Evaluated with 95%+ parity momentum filter.',
           contractType: 'DIGITODD' as const,
-          direction: 'ODD',
+          direction: 'ODD' as const,
           duration: 1
         };
       case 'call':
@@ -192,7 +198,7 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
           winRate: 95.4,
           desc: 'Wins if exit tick price is strictly higher than entry tick quote.',
           contractType: 'CALL' as const,
-          direction: 'UP',
+          direction: 'UP' as const,
           duration: 2
         };
       case 'put':
@@ -202,7 +208,7 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
           winRate: 95.4,
           desc: 'Wins if exit tick price is strictly lower than entry tick quote.',
           contractType: 'PUT' as const,
-          direction: 'DOWN',
+          direction: 'DOWN' as const,
           duration: 2
         };
     }
@@ -974,6 +980,15 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
 
       {/* Demo Trades History Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+        {/* Export CSV Modal */}
+        <ExportCsvModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          trades={trades}
+          filteredTrades={filteredTrades}
+          activeFilterName={historyFilter !== 'all' ? `${historyFilter.toUpperCase()} ONLY` : undefined}
+        />
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-emerald-400" />
@@ -985,22 +1000,67 @@ export const DemoTradingTerminal: React.FC<DemoTradingTerminalProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {(['all', 'wins', 'losses'] as const).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setHistoryFilter(filter)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold capitalize transition-colors ${
-                  historyFilter === filter
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-white'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1">
+              {(['all', 'wins', 'losses'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setHistoryFilter(filter)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold capitalize transition-colors ${
+                    historyFilter === filter
+                      ? 'bg-emerald-500 text-slate-950'
+                      : 'bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+
+            {/* Export CSV Buttons */}
+            {trades.length > 0 && (
+              <div className="flex items-center gap-1.5 pl-2 sm:border-l sm:border-slate-800">
+                <button
+                  id="demo-export-csv-btn"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-mono font-bold text-emerald-300 transition-all shadow-sm hover:scale-[1.02]"
+                  title="Export Demo Trades to CSV for Excel or Google Sheets"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Export CSV</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const res = exportTradesToCSV(filteredTrades.length > 0 ? filteredTrades : trades, {
+                      filename: `deriv_demo_trades_${Date.now()}.csv`
+                    });
+                    if (res.success) {
+                      setExportNotice(`Exported ${res.count} demo trades to ${res.filename}`);
+                      setTimeout(() => setExportNotice(null), 4000);
+                    }
+                  }}
+                  className="p-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                  title="1-Click Direct CSV Download"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Export Notice Banner */}
+        {exportNotice && (
+          <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between gap-2 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{exportNotice}</span>
+            </div>
+            <span className="text-[10px] text-emerald-400/80">Ready for Excel &amp; Google Sheets</span>
+          </div>
+        )}
 
         {filteredTrades.length === 0 ? (
           <div className="text-center py-8 text-slate-500 text-xs font-mono">

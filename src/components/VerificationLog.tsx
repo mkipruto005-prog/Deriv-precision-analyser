@@ -14,8 +14,12 @@ import {
   RotateCcw,
   Sparkles,
   Award,
-  Download
+  Download,
+  FileSpreadsheet,
+  Check
 } from 'lucide-react';
+import { ExportCsvModal } from './ExportCsvModal';
+import { exportTradesToCSV } from '../utils/exportCsv';
 
 interface VerificationLogProps {
   trades: TradeRecord[];
@@ -30,6 +34,8 @@ export const VerificationLog: React.FC<VerificationLogProps> = ({
 }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [outcomeFilter, setOutcomeFilter] = useState<'ALL' | 'WIN' | 'LOSS'>('ALL');
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const filteredTrades = trades.filter(t => {
     const matchesType = filterType === 'ALL' || t.contractType === filterType;
@@ -37,40 +43,38 @@ export const VerificationLog: React.FC<VerificationLogProps> = ({
     return matchesType && matchesOutcome;
   });
 
-  const handleExportCSV = () => {
+  const handleQuickDownloadCSV = () => {
     if (trades.length === 0) return;
-    const headers = ['ID', 'Timestamp', 'Symbol', 'Contract', 'Confidence', 'Entry Quote', 'Exit Quote', 'Outcome', 'Stake', 'Payout', 'Profit'];
-    const rows = trades.map(t => [
-      t.id,
-      new Date(t.timestamp * 1000).toISOString(),
-      t.symbol,
-      t.contractType,
-      `${t.confidence}%`,
-      t.entryQuote,
-      t.exitQuote,
-      t.outcome,
-      t.stake,
-      t.payout,
-      t.profit
-    ]);
+    const target = (filterType !== 'ALL' || outcomeFilter !== 'ALL') ? filteredTrades : trades;
+    const res = exportTradesToCSV(target, {
+      filename: `deriv_trade_history_${Date.now()}.csv`
+    });
 
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `deriv_precision_audit_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (res.success) {
+      setExportNotice(`Exported ${res.count} trades to ${res.filename}`);
+      setTimeout(() => setExportNotice(null), 4000);
+    }
   };
 
   const ultraAccuracy = summary.ultraSignals > 0 
     ? (summary.ultraWins / summary.ultraSignals) * 100 
     : 96.2; // default verified benchmark
 
+  const activeFilterLabel = filterType !== 'ALL' || outcomeFilter !== 'ALL'
+    ? `${filterType !== 'ALL' ? filterType : ''} ${outcomeFilter !== 'ALL' ? outcomeFilter : ''}`.trim()
+    : undefined;
+
   return (
     <div id="verification-log-panel" className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-6">
+      {/* Export CSV Modal */}
+      <ExportCsvModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        trades={trades}
+        filteredTrades={filteredTrades}
+        activeFilterName={activeFilterLabel}
+      />
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
@@ -93,14 +97,25 @@ export const VerificationLog: React.FC<VerificationLogProps> = ({
         <div className="flex items-center gap-2">
           {trades.length > 0 && (
             <>
+              {/* Export to CSV Button */}
               <button
-                onClick={handleExportCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs text-emerald-300 font-medium transition-colors"
-                title="Download verified audit logs as CSV"
+                id="export-trade-history-csv-btn"
+                onClick={() => setIsExportModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs text-emerald-300 font-mono font-bold transition-all shadow-sm group hover:scale-[1.02]"
+                title="Export trades to CSV for Excel or Google Sheets"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export CSV</span>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 group-hover:animate-pulse" />
+                <span>Export CSV ({trades.length})</span>
               </button>
+
+              <button
+                onClick={handleQuickDownloadCSV}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                title="1-Click Quick Download CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
               <button
                 onClick={onClearTrades}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-medium transition-colors"
@@ -112,6 +127,17 @@ export const VerificationLog: React.FC<VerificationLogProps> = ({
           )}
         </div>
       </div>
+
+      {/* Export Notice Banner */}
+      {exportNotice && (
+        <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between gap-2 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{exportNotice}</span>
+          </div>
+          <span className="text-[10px] text-emerald-400/80">Ready for Excel &amp; Google Sheets</span>
+        </div>
+      )}
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

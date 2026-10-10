@@ -112,6 +112,13 @@ export const CONTRACT_INFO = {
     payoutRate: 809.0,
     idealTicks: 1
   },
+  DIGITMATCHES: {
+    name: 'Digit Matches',
+    description: 'Wins if the last digit matches. High payout ~800%, low base probability 10%.',
+    baseEdge: 10.0,
+    payoutRate: 809.0,
+    idealTicks: 1
+  },
   DIGITOVER: {
     name: 'Digit Over',
     description: 'Wins if last digit is greater than target. E.g., Over 1 wins on 2,3,4,5,6,7,8,9 (80% base rate, 95%+ with momentum filter).',

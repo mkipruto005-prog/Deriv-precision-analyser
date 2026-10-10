@@ -11,6 +11,7 @@ export interface DerivTelemetry {
   gateway: string;
   realTickCount: number;
   lastServerTime?: number;
+  lastTickReceivedAt?: number;
   reconnectAttempts: number;
 }
 
@@ -43,6 +44,7 @@ interface DerivWsHandlers {
 
 const OFFICIAL_DERIV_GATEWAYS = [
   'wss://ws.derivws.com/websockets/v3',
+  'wss://frontend.derivws.com/websockets/v3',
   'wss://ws.binaryws.com/websockets/v3',
   'wss://blue.derivws.com/websockets/v3'
 ];
@@ -53,6 +55,8 @@ export class DerivWebSocketClient {
   private handlers: DerivWsHandlers;
   private appId: string = '1089'; // Official Deriv default public app id
   private apiToken: string = '';
+  private authorizedToken: string = '';
+  private isAuthorizing: boolean = false;
   private accountInfo: DerivAccountInfo | null = null;
   private pingInterval: number | null = null;
   private lastPingTime: number = 0;
@@ -62,7 +66,6 @@ export class DerivWebSocketClient {
   private fallbackPrice: number = 1000;
   private status: ConnectionStatus = 'DISCONNECTED';
   private contractToSignalMap: Map<string, string> = new Map();
-  private rejectedTokens: Set<string> = new Set();
   private hasReportedAuthError: boolean = false;
   private gatewayIndex: number = 0;
   private reconnectTimer: number | null = null;
@@ -78,14 +81,13 @@ export class DerivWebSocketClient {
 
   public setAppConfig(appId?: string, apiToken?: string) {
     const oldAppId = this.appId;
-    const oldToken = this.apiToken;
     if (appId && appId.trim()) this.appId = appId.trim();
     if (apiToken !== undefined) {
       const cleanToken = apiToken.trim();
-      if (cleanToken !== oldToken) {
-        this.apiToken = cleanToken;
-        this.rejectedTokens.delete(cleanToken);
-        this.hasReportedAuthError = false;
+      this.apiToken = cleanToken;
+      this.hasReportedAuthError = false;
+      if (cleanToken !== this.authorizedToken) {
+        this.authorize(cleanToken);
       }
     }
 
@@ -96,19 +98,41 @@ export class DerivWebSocketClient {
   }
 
   public authorize(token: string) {
-    this.apiToken = token.trim();
-    this.rejectedTokens.delete(this.apiToken);
+    const cleanToken = token.trim();
+    this.apiToken = cleanToken;
     this.hasReportedAuthError = false;
+
+    if (!cleanToken) {
+      this.logout();
+      return;
+    }
+
+    // If already authorized with this exact token, avoid redundant calls
+    if (this.accountInfo?.isAuthorized && this.authorizedToken === cleanToken) {
+      return;
+    }
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ authorize: this.apiToken }));
+      this.sendAuthorize(cleanToken);
     } else if (this.currentSymbol) {
       this.connect(this.currentSymbol);
     }
   }
 
+  private sendAuthorize(token: string) {
+    if (!token || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.isAuthorizing = true;
+    try {
+      this.ws.send(JSON.stringify({ authorize: token }));
+    } catch (e) {
+      this.isAuthorizing = false;
+    }
+  }
+
   public logout() {
     this.apiToken = '';
-    this.rejectedTokens.clear();
+    this.authorizedToken = '';
+    this.isAuthorizing = false;
     this.hasReportedAuthError = false;
     this.accountInfo = { isAuthorized: false };
     if (this.handlers.onAccountUpdate) {
@@ -135,18 +159,6 @@ export class DerivWebSocketClient {
       this.ws = null;
     }
 
-    // Only attempt the REST options API if the user provided a token AND a custom App ID (not public 1089)
-    // Because Deriv's REST options endpoint rejects app_id 1089 with HTTP 401 Invalid application.
-    if (
-      this.apiToken &&
-      this.apiToken.startsWith('pat_') &&
-      this.appId !== '1089' &&
-      !this.rejectedTokens.has(this.apiToken)
-    ) {
-      this.connectWithPat(symbol, this.apiToken, this.appId);
-      return;
-    }
-
     const gateway = OFFICIAL_DERIV_GATEWAYS[this.gatewayIndex] || 'wss://ws.derivws.com/websockets/v3';
     const url = `${gateway}?app_id=${this.appId}&l=en`;
     this.openWebSocket(url, symbol, false);
@@ -155,10 +167,12 @@ export class DerivWebSocketClient {
   public reconnect() {
     this.isIntentionalClose = false;
     this.reconnectAttempts = 0;
+    this.gatewayIndex = 0;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.stopFallback();
     if (this.currentSymbol) {
       this.connect(this.currentSymbol);
     }
@@ -220,9 +234,9 @@ export class DerivWebSocketClient {
           this.ws?.send(JSON.stringify({ ping: 1 }));
         } catch {}
 
-        // If not authorized via OTP and user provided a token that wasn't already rejected, authorize via WS
-        if (!isAuthorizedViaOtp && this.apiToken && !this.rejectedTokens.has(this.apiToken)) {
-          this.ws?.send(JSON.stringify({ authorize: this.apiToken }));
+        // If user provided an API token, authorize cleanly
+        if (this.apiToken) {
+          this.sendAuthorize(this.apiToken);
         }
 
         // Subscribe to ticks for active symbol
@@ -253,115 +267,6 @@ export class DerivWebSocketClient {
       };
     } catch {
       this.scheduleReconnect();
-    }
-  }
-
-  private async connectWithPat(symbol: DerivSymbol, pat: string, appId: string) {
-    this.updateStatus('CONNECTING', 0);
-    const cleanAppId = appId.trim() || '1089';
-
-    try {
-      // Step 1: Query accounts via Deriv REST API
-      const accountsRes = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${pat}`,
-          'Deriv-App-ID': cleanAppId,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!accountsRes.ok) {
-        let errorText = await accountsRes.text();
-        try {
-          const errJson = JSON.parse(errorText);
-          errorText = errJson.message || errJson.errors?.[0]?.message || errorText;
-        } catch {}
-
-        this.accountInfo = { isAuthorized: false };
-        if (this.handlers.onAccountUpdate) {
-          this.handlers.onAccountUpdate(this.accountInfo);
-        }
-
-        // If REST API rejected the app_id/token (e.g. 401 Invalid application),
-        // fallback to standard Deriv WebSocket v3 connection which allows direct authorization
-        const fallbackUrl = `wss://ws.derivws.com/websockets/v3?app_id=${cleanAppId}`;
-        this.openWebSocket(fallbackUrl, symbol, false);
-        return;
-      }
-
-      const accountsData = await accountsRes.json();
-      let accounts: any[] = [];
-      if (Array.isArray(accountsData)) {
-        accounts = accountsData;
-      } else if (Array.isArray(accountsData.data)) {
-        accounts = accountsData.data;
-      } else if (Array.isArray(accountsData.accounts)) {
-        accounts = accountsData.accounts;
-      }
-
-      if (accounts.length === 0) {
-        if (this.handlers.onError) {
-          this.handlers.onError('No trading accounts found for this Deriv PAT token. Please verify your account setup on Deriv.');
-        }
-        const fallbackUrl = `wss://ws.derivws.com/websockets/v3?app_id=${cleanAppId}`;
-        this.openWebSocket(fallbackUrl, symbol, false);
-        return;
-      }
-
-      // Prefer demo account or first account
-      const selectedAccount = accounts.find((a: any) => a.type === 'demo' || String(a.id || a.account_id).startsWith('VRTC')) || accounts[0];
-      const accountId = selectedAccount.id || selectedAccount.account_id || selectedAccount.accountId;
-
-      // Step 2: Request short-lived single-use OTP for WebSocket authentication
-      const otpRes = await fetch(`https://api.derivws.com/trading/v1/options/accounts/${accountId}/otp`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${pat}`,
-          'Deriv-App-ID': cleanAppId,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!otpRes.ok) {
-        let otpErr = await otpRes.text();
-        try {
-          const otpErrJson = JSON.parse(otpErr);
-          otpErr = otpErrJson.message || otpErrJson.errors?.[0]?.message || otpErr;
-        } catch {}
-        if (this.handlers.onError) {
-          this.handlers.onError(`Deriv OTP Error: ${otpErr}. Could not generate authenticated trading connection.`);
-        }
-        const fallbackUrl = `wss://ws.derivws.com/websockets/v3?app_id=${cleanAppId}`;
-        this.openWebSocket(fallbackUrl, symbol, false);
-        return;
-      }
-
-      const otpData = await otpRes.json();
-      const wsUrl = otpData.ws_url || `wss://api.derivws.com/trading/v1/options/ws/${selectedAccount.type === 'real' ? 'real' : 'demo'}?otp=${otpData.otp}`;
-
-      // Mark account authorized
-      this.accountInfo = {
-        isAuthorized: true,
-        loginid: String(accountId),
-        currency: selectedAccount.currency || 'USD',
-        balance: typeof selectedAccount.balance === 'number' ? selectedAccount.balance : (selectedAccount.total_cash ?? 10000),
-        isVirtual: selectedAccount.type === 'demo' || String(accountId).startsWith('VRTC'),
-        email: selectedAccount.email
-      };
-      if (this.handlers.onAccountUpdate) {
-        this.handlers.onAccountUpdate(this.accountInfo);
-      }
-
-      // Connect to the authenticated WebSocket URL
-      this.openWebSocket(wsUrl, symbol, true);
-    } catch (err: any) {
-      console.warn('PAT connection error:', err);
-      if (this.handlers.onError) {
-        this.handlers.onError(`PAT Connection Error: ${err?.message || 'Network error connecting to Deriv API'}`);
-      }
-      const fallbackUrl = `wss://ws.derivws.com/websockets/v3?app_id=${cleanAppId}`;
-      this.openWebSocket(fallbackUrl, symbol, false);
     }
   }
 
@@ -411,18 +316,29 @@ export class DerivWebSocketClient {
       const errMsg = data.error.message || 'Deriv API error';
       console.warn('Deriv API response error:', errMsg);
 
+      // If token is already authorized on this socket, treat as success
+      if (data.error.code === 'AlreadyAuthorized') {
+        this.isAuthorizing = false;
+        if (this.apiToken) {
+          this.authorizedToken = this.apiToken;
+        }
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
+        }
+        return;
+      }
+
       // Check if authorization failed
       if (data.msg_type === 'authorize' || data.error.code === 'InvalidToken' || data.error.code === 'AuthorizationRequired') {
+        this.isAuthorizing = false;
+        this.authorizedToken = '';
         this.accountInfo = { isAuthorized: false };
-        if (this.apiToken) {
-          this.rejectedTokens.add(this.apiToken);
-        }
         if (this.handlers.onAccountUpdate) {
           this.handlers.onAccountUpdate({ isAuthorized: false });
         }
         if (this.handlers.onError && !this.hasReportedAuthError) {
           this.hasReportedAuthError = true;
-          this.handlers.onError(`Deriv Auth Notice: Token rejected (${errMsg}). Real trades paused; simulation running.`);
+          this.handlers.onError(`Deriv Auth Notice: Token rejected (${errMsg}). Check permissions and enter a valid token.`);
         }
         return;
       }
@@ -452,17 +368,41 @@ export class DerivWebSocketClient {
 
     // Authorize response
     if (data.msg_type === 'authorize') {
+      this.isAuthorizing = false;
       if (data.authorize) {
+        this.authorizedToken = this.apiToken;
+        const auth = data.authorize;
+        const accountList = Array.isArray(auth.account_list)
+          ? auth.account_list.map((a: any) => ({
+              loginid: a.loginid,
+              isVirtual: a.is_virtual === 1,
+              currency: a.currency || 'USD',
+              category: a.account_category
+            }))
+          : [];
+
         this.accountInfo = {
           isAuthorized: true,
-          loginid: data.authorize.loginid,
-          currency: data.authorize.currency,
-          balance: data.authorize.balance,
-          isVirtual: data.authorize.is_virtual === 1
+          loginid: auth.loginid,
+          currency: auth.currency,
+          balance: typeof auth.balance === 'number' ? auth.balance : 0,
+          isVirtual: auth.is_virtual === 1,
+          email: auth.email,
+          scopes: Array.isArray(auth.scopes) ? auth.scopes : [],
+          accountList
         };
+
         if (this.handlers.onAccountUpdate) {
           this.handlers.onAccountUpdate(this.accountInfo);
         }
+
+        // Notify user if token lacks Trade permissions
+        if (Array.isArray(auth.scopes) && !auth.scopes.includes('trade')) {
+          if (this.handlers.onError) {
+            this.handlers.onError(`Deriv Warning: Connected account ${auth.loginid} has Read-Only permissions. To place orders, regenerate your token with the "Trade" scope.`);
+          }
+        }
+
         // Subscribe to live balance updates
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
@@ -617,13 +557,14 @@ export class DerivWebSocketClient {
           try {
             this.ws.send(JSON.stringify({
               ticks_history: symId,
-              count: 60,
+              count: 100,
               end: 'latest',
-              style: 'ticks'
+              style: 'ticks',
+              subscribe: 1
             }));
           } catch {}
         }
-      }, idx * 45);
+      }, idx * 60);
     });
   }
 

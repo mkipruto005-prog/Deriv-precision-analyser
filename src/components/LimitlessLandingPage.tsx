@@ -17,9 +17,13 @@ import {
   Zap,
   Target,
   Radio,
-  ArrowRight
+  ArrowRight,
+  Wallet,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { soundEngine } from '../services/audioAlert';
+import { getDerivOAuthUrl } from '../utils/derivOAuth';
 
 // Official WhatsApp brand icon SVG
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -34,15 +38,22 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" 
 
 interface LimitlessLandingPageProps {
   onLoginSuccess: () => void;
+  onLoginWithDeriv?: () => void;
+  appId?: string;
 }
 
-export const LimitlessLandingPage: React.FC<LimitlessLandingPageProps> = ({ onLoginSuccess }) => {
+export const LimitlessLandingPage: React.FC<LimitlessLandingPageProps> = ({ 
+  onLoginSuccess,
+  onLoginWithDeriv,
+  appId = '1089'
+}) => {
   // Input states
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(true);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(true);
+  const [installInstruction, setInstallInstruction] = useState<string | null>(null);
 
   // Status & modal states
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -52,6 +63,17 @@ export const LimitlessLandingPage: React.FC<LimitlessLandingPageProps> = ({ onLo
 
   // Direct WhatsApp contact link (Phone number: +254726152651 kept strictly in link href, hidden from visual display)
   const whatsappUrl = "https://wa.me/254726152651?text=Hello%20Admin%2C%20I%20would%20like%20to%20get%20login%20credentials%20for%20Deriv%20Precision%20Analyzer";
+
+  // Trigger 3rd party Deriv OAuth login flow
+  const handleDerivOAuthLogin = () => {
+    soundEngine.playTickPing();
+    if (onLoginWithDeriv) {
+      onLoginWithDeriv();
+    } else {
+      const url = getDerivOAuthUrl(appId);
+      window.location.href = url;
+    }
+  };
 
   // Handle Login validation
   const handleLogin = (e: React.FormEvent) => {
@@ -131,7 +153,7 @@ export const LimitlessLandingPage: React.FC<LimitlessLandingPageProps> = ({ onLo
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                alert('To install on your mobile device: Tap your browser menu (⋮ or Share) and select "Add to Home screen".');
+                setInstallInstruction('To install on your mobile device: Tap your browser menu (⋮ or Share) and select "Add to Home screen".');
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/25 to-teal-500/25 hover:from-emerald-500/40 hover:to-teal-500/40 border border-emerald-400/40 text-emerald-300 text-[11px] font-bold transition-all shadow-sm"
             >
@@ -139,13 +161,28 @@ export const LimitlessLandingPage: React.FC<LimitlessLandingPageProps> = ({ onLo
               <span>Install app</span>
             </button>
             <button
-              onClick={() => setShowInstallBanner(false)}
+              onClick={() => {
+                setShowInstallBanner(false);
+                setInstallInstruction(null);
+              }}
               className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/60 transition-colors"
               title="Dismiss"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
+        </div>
+      )}
+
+      {installInstruction && (
+        <div className="w-full max-w-md py-2.5 px-3.5 mb-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px] z-20 flex items-center justify-between shadow-lg">
+          <span>{installInstruction}</span>
+          <button 
+            onClick={() => setInstallInstruction(null)}
+            className="text-emerald-400 hover:text-emerald-200 ml-2 font-bold text-xs"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -233,6 +270,58 @@ export const LimitlessLandingPage: React.FC<LimitlessLandingPageProps> = ({ onLo
         
         {/* Top glowing ambient highlight line */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80" />
+
+        {/* =========================================================================
+            PRIMARY METHOD: 1-CLICK DERIV OAUTH 2.0 LOGIN (LIKE DBTRADERS)
+           ========================================================================= */}
+        <div className="w-full flex flex-col gap-2.5 pb-4 border-b border-slate-800/80">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black tracking-wider text-emerald-400 uppercase font-mono flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5" />
+              <span>Recommended Login</span>
+            </span>
+            <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              REAL &amp; DEMO
+            </span>
+          </div>
+
+          {/* Large, Glowing Login with Deriv Button */}
+          <button
+            id="landing-deriv-oauth-btn"
+            type="button"
+            onClick={handleDerivOAuthLogin}
+            className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 active:scale-[0.99] text-slate-950 font-black text-sm sm:text-base tracking-wide transition-all shadow-[0_0_30px_rgba(16,185,129,0.45)] flex items-center justify-center gap-2.5 border border-emerald-300 group"
+          >
+            <Wallet className="w-5 h-5 text-slate-950 fill-slate-950 shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-extrabold tracking-tight">LOGIN WITH DERIV</span>
+            <ArrowRight className="w-4 h-4 text-slate-950 stroke-[3] group-hover:translate-x-0.5 transition-transform" />
+          </button>
+
+          <p className="text-[11px] text-slate-300 text-center leading-tight">
+            Log in with your Deriv email or Google account to grant secure access. Automatically loads your <strong className="text-cyan-300 font-bold">Demo</strong> and <strong className="text-emerald-400 font-bold">Real</strong> accounts with 1-click switching.
+          </p>
+
+          {/* Instant Guest / Practice Demo Terminal Button */}
+          <button
+            id="landing-guest-demo-btn"
+            type="button"
+            onClick={() => {
+              soundEngine.playTickPing();
+              onLoginSuccess();
+            }}
+            className="w-full py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-750 border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white font-bold text-xs font-mono transition-all flex items-center justify-center gap-2 shadow-sm"
+          >
+            <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+            <span>TRY FREE DEMO TERMINAL (NO ACCOUNT NEEDED)</span>
+          </button>
+        </div>
+
+        {/* OR Divider with subtle glow */}
+        <div className="flex items-center gap-3 my-0.5">
+          <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent to-[#283366]" />
+          <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">Or Admin Login</span>
+          <div className="flex-1 h-[1px] bg-gradient-to-l from-transparent to-[#283366]" />
+        </div>
 
         {/* Error Notification */}
         {errorMessage && (

@@ -6,7 +6,9 @@ import {
   PrecisionSignal,
   Under8Stats,
   MarketScanResult,
-  TradeRecord
+  TradeRecord,
+  BulkBatchOrder,
+  BulkOrderLeg
 } from '../types';
 import { 
   analyzeUnder8Market, 
@@ -72,6 +74,8 @@ interface Under8AnalyzerProps {
   onSaveConfig?: (appId: string, apiToken: string) => void;
   isLiveExecutionEnabled?: boolean;
   onToggleLiveExecution?: (enabled: boolean) => void;
+  onExecuteBulkBatch?: (batch: BulkBatchOrder) => void;
+  onNavigateToBulk?: () => void;
 }
 
 export const Under8Analyzer: React.FC<Under8AnalyzerProps> = ({
@@ -89,7 +93,9 @@ export const Under8Analyzer: React.FC<Under8AnalyzerProps> = ({
   appId = '1089',
   onSaveConfig = () => {},
   isLiveExecutionEnabled = false,
-  onToggleLiveExecution = () => {}
+  onToggleLiveExecution = () => {},
+  onExecuteBulkBatch,
+  onNavigateToBulk
 }) => {
   const [windowSize, setWindowSize] = useState<number>(100);
   const [stakeAmount, setStakeAmount] = useState<number>(1);
@@ -579,6 +585,48 @@ export const Under8Analyzer: React.FC<Under8AnalyzerProps> = ({
     };
 
     onExecuteTrade(sig, stakeAmount);
+  };
+
+  const handleBulkStrikeUnder8 = (batchCount = 5) => {
+    if (!currentTick) return;
+    const stakeToUse = botActive ? currentBotStake : stakeAmount;
+    if (onExecuteBulkBatch) {
+      const legs: BulkOrderLeg[] = [];
+      for (let i = 0; i < batchCount; i++) {
+        legs.push({
+          id: `LEG_U8_${Date.now()}_${i + 1}`,
+          legIndex: i + 1,
+          symbol: symbol.id,
+          contractType: 'DIGITUNDER',
+          barrier: 8,
+          target: 'UNDER 8',
+          stake: stakeToUse,
+          status: 'PENDING'
+        });
+      }
+      const batch: BulkBatchOrder = {
+        id: `BATCH_U8_${Date.now()}`,
+        timestamp: Math.floor(Date.now() / 1000),
+        mode: 'INSTANT_BURST',
+        strategyName: 'Under 8 Fortress Batch',
+        symbol: symbol.id,
+        contractType: 'DIGITUNDER',
+        totalContracts: batchCount,
+        totalStake: parseFloat((stakeToUse * batchCount).toFixed(2)),
+        completedContracts: 0,
+        status: 'PENDING',
+        legs,
+        totalProfit: 0,
+        totalPayout: 0,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        isRealDeriv: Boolean(isLiveExecutionEnabled && accountInfo?.isAuthorized)
+      };
+      onExecuteBulkBatch(batch);
+    } else if (onNavigateToBulk) {
+      onNavigateToBulk();
+    }
   };
 
   // Compounding calculation: standard Deriv Under 8 payout is ~23.5%
@@ -1334,6 +1382,17 @@ export const Under8Analyzer: React.FC<Under8AnalyzerProps> = ({
                   >
                     <Zap className="w-4 h-4 text-amber-400" />
                     <span>STRIKE 1-TICK NOW (+${(((botActive ? currentBotStake : stakeAmount)) * payoutMultiplier).toFixed(2)})</span>
+                  </button>
+
+                  {/* Bulk Strike 5x Button */}
+                  <button
+                    disabled={Boolean(pendingTrade)}
+                    onClick={() => handleBulkStrikeUnder8(5)}
+                    className="px-3.5 py-2.5 rounded-xl font-bold text-xs font-mono transition-all flex items-center gap-1.5 bg-indigo-900/70 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/70 shadow-md shadow-indigo-950/40 disabled:opacity-50"
+                    title="Execute a Bulk Batch of 5 Under-8 contracts simultaneously on current edge"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>BULK 5x</span>
                   </button>
 
                   {/* Open Mission Control Tab */}

@@ -1,6 +1,7 @@
 export type DerivContractType = 
   | 'DIGITDIFF' 
   | 'DIGITMATCH' 
+  | 'DIGITMATCHES'
   | 'DIGITOVER' 
   | 'DIGITUNDER' 
   | 'DIGITEVEN' 
@@ -9,6 +10,8 @@ export type DerivContractType =
   | 'PUT'
   | 'TOUCH'
   | 'NOTOUCH';
+
+export type ContractType = DerivContractType;
 
 export interface DerivSymbol {
   id: string;
@@ -188,6 +191,10 @@ export interface Under8Stats {
   oneTickWinRateForCurrentDigit: number;
   digit8Transition?: DigitTransitionEdge;
   isDigit8EntryReady?: boolean;
+  isRealDerivConnected?: boolean;
+  realTicksCount?: number;
+  breachCooldownRemaining?: number;
+  isHighDigitClusterRisk?: boolean;
 }
 
 export interface AccuracySummary {
@@ -205,6 +212,14 @@ export interface AccuracySummary {
   roi: number;
 }
 
+export interface DerivAccountItem {
+  loginid: string;
+  isVirtual: boolean;
+  currency: string;
+  category?: string;
+  token?: string;
+}
+
 export interface DerivAccountInfo {
   isAuthorized: boolean;
   loginid?: string;
@@ -212,6 +227,8 @@ export interface DerivAccountInfo {
   balance?: number;
   isVirtual?: boolean;
   email?: string;
+  scopes?: string[];
+  accountList?: DerivAccountItem[];
 }
 
 export interface DigitMatchPrediction {
@@ -424,5 +441,62 @@ export interface ActiveTradersSummary {
   predictionsGenerated: number;
   averageWinRate: number;
   totalVolume: number;
+}
+
+// Bulk Trading Types
+export type BulkExecutionMode = 'INSTANT_BURST' | 'STAGGERED_TICK' | 'MULTI_MARKET_BASKET';
+
+export interface BulkOrderLeg {
+  id: string;
+  legIndex: number;
+  symbol: string;
+  contractType: ContractType;
+  barrier?: number | string;
+  target: string;
+  stake: number;
+  status: 'PENDING' | 'EXECUTING' | 'WON' | 'LOST' | 'FAILED';
+  entryQuote?: number;
+  entryDigit?: number;
+  exitQuote?: number;
+  exitDigit?: number;
+  profit?: number;
+  payout?: number;
+  derivContractId?: number | string;
+  error?: string;
+  executedEpoch?: number;
+}
+
+export interface BulkBatchOrder {
+  id: string;
+  timestamp: number;
+  mode: BulkExecutionMode;
+  strategyName: string;
+  symbol: string;
+  contractType: ContractType;
+  totalContracts: number;
+  totalStake: number;
+  completedContracts: number;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'STOPPED_OUT' | 'FAILED';
+  legs: BulkOrderLeg[];
+  totalProfit: number;
+  totalPayout: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  isRealDeriv: boolean;
+  notes?: string;
+}
+
+export interface BulkTradingPreset {
+  id: string;
+  name: string;
+  description: string;
+  contractType: ContractType;
+  defaultBarrier?: number;
+  recommendedBatchSize: number;
+  estimatedPayoutRate: number;
+  targetWinRate: number;
+  riskRating: 'LOW' | 'MEDIUM' | 'HIGH';
+  icon: string;
 }
 

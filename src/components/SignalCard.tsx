@@ -169,13 +169,13 @@ export const SignalSparkline: React.FC<SignalSparklineProps> = ({
       return `Mean-Reversion Exhaustion: 10-tick rally reached resistance ceiling, priming high-probability ${type} short reversal.`;
     }
 
-    if (type === 'DIFFERS') {
+    if (type === 'DIGITDIFF' || (type as string) === 'DIFFERS') {
       const predDigit = signal.predictedDigit;
       const occurrences = displayTicks.filter(t => t.lastDigit === predDigit).length;
       return `Cold Digit Sequence: Target digit [${predDigit}] appeared ${occurrences} time(s) across the 10-tick pre-signal lead-in.`;
     }
 
-    if (type === 'MATCHES') {
+    if (type === 'DIGITMATCH' || type === 'DIGITMATCHES' || (type as string) === 'MATCHES') {
       const predDigit = signal.predictedDigit;
       return `Resonance Cluster: Leading momentum converging into key target digit [${predDigit}] strike zone.`;
     }
