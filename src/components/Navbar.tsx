@@ -28,13 +28,18 @@ import {
   BarChart2,
   Sparkles,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Shield,
+  Copy,
+  Check,
+  Key,
+  ExternalLink
 } from 'lucide-react';
 import { DERIV_SYMBOLS } from '../constants/symbols';
 import { DerivSymbol, DerivAccountInfo } from '../types';
 import { ConnectionStatus, DerivTelemetry } from '../services/derivWebSocket';
 import { notificationService, NotificationPermissionState } from '../services/notificationService';
-import { DerivOAuthAccount } from '../utils/derivOAuth';
+import { DerivOAuthAccount, getDerivOAuthUrl } from '../utils/derivOAuth';
 
 type ViewType = 'dashboard' | 'digits' | 'under8' | 'matches' | 'evenodd' | 'risk' | 'history' | 'profitplus' | 'active_users' | 'demo' | 'bulk';
 
@@ -61,6 +66,9 @@ interface NavbarProps {
   onLogout?: () => void;
   savedAccounts?: DerivOAuthAccount[];
   onSelectAccount?: (token: string) => void;
+  appId?: string;
+  onUpdateAppId?: (newId: string) => void;
+  onLoginWithDeriv?: (customAppId?: string) => void;
 }
 
 interface ToolNavItem {
@@ -98,7 +106,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSourceCode,
   onLogout,
   savedAccounts = [],
-  onSelectAccount
+  onSelectAccount,
+  appId = '1089',
+  onUpdateAppId,
+  onLoginWithDeriv
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
@@ -107,6 +118,20 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'volatility_1s' | 'volatility'>('all');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+
+  // Quick App ID Modal states
+  const [isAppIdModalOpen, setIsAppIdModalOpen] = useState(false);
+  const [tempAppId, setTempAppId] = useState(appId || '1089');
+  const [appIdSavedNotice, setAppIdSavedNotice] = useState(false);
+  const [isCopiedRedirect, setIsCopiedRedirect] = useState(false);
+
+  useEffect(() => {
+    setTempAppId(appId || '1089');
+  }, [appId]);
+
+  const currentRedirectUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}`
+    : 'https://ais-pre-uwor5ihwm7yxe5kryjipat-53685294932.europe-west2.run.app';
 
   // Horizontal scroll state & ref for the tools strip
   const toolsScrollRef = useRef<HTMLDivElement>(null);
@@ -620,17 +645,47 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
           ) : (
-            /* Prominent Login with Deriv Button (Fully visible on all mobile and desktop screens) */
-            <button
-              id="nav-link-deriv-btn"
-              onClick={onOpenSettings}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs font-mono transition-all shrink-0 shadow-md shadow-emerald-500/25 active:scale-95 border border-emerald-300"
-              title="Log in with Deriv to access your account"
-            >
-              <Wallet className="w-3.5 h-3.5 text-slate-950 fill-slate-950 shrink-0" />
-              <span className="whitespace-nowrap font-extrabold tracking-tight">Login with Deriv</span>
-              <ArrowRight className="w-3 h-3 text-slate-950 stroke-[3] hidden xs:inline" />
-            </button>
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {/* Registered App ID Badge (Click to view or edit) */}
+              <button
+                id="nav-app-id-btn"
+                type="button"
+                onClick={() => {
+                  setTempAppId(appId || '1089');
+                  setIsAppIdModalOpen(true);
+                }}
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-emerald-500/30 text-xs font-mono transition-colors shadow-sm"
+                title="Your registered Deriv App ID. Click to change."
+              >
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-slate-400 text-[10px]">App ID:</span>
+                <span className="text-emerald-400 font-bold text-xs">{appId || '1089'}</span>
+                {appId && appId !== '1089' ? (
+                  <span className="text-[8px] bg-emerald-500 text-slate-950 px-1 rounded font-black">
+                    REGISTERED
+                  </span>
+                ) : (
+                  <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1 rounded font-semibold border border-amber-500/30">
+                    SET ID
+                  </span>
+                )}
+              </button>
+
+              {/* Prominent Login with Deriv Button */}
+              <button
+                id="nav-link-deriv-btn"
+                type="button"
+                onClick={() => {
+                  setIsAppIdModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs font-mono transition-all shrink-0 shadow-md shadow-emerald-500/25 active:scale-95 border border-emerald-300"
+                title={`Connect Deriv account (App ID: ${appId || '1089'})`}
+              >
+                <Wallet className="w-3.5 h-3.5 text-slate-950 fill-slate-950 shrink-0" />
+                <span className="whitespace-nowrap font-extrabold tracking-tight">Login with Deriv</span>
+                <ArrowRight className="w-3 h-3 text-slate-950 stroke-[3] hidden sm:inline" />
+              </button>
+            </div>
           )}
 
           {/* Deriv Connection Indicator (hidden on small mobile to give priority to Login button) */}
@@ -849,26 +904,61 @@ export const Navbar: React.FC<NavbarProps> = ({
          ========================================================================= */}
       {!accountInfo.isAuthorized ? (
         /* Mobile Login Banner (Visible only on < sm mobile screens) */
-        <div className="sm:hidden w-full bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 border-b border-emerald-500/40 px-3 py-2 flex items-center justify-between gap-2 shadow-inner">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[11px] font-black text-white tracking-wide truncate">
-                Deriv Account: Not Connected
-              </span>
-              <span className="text-[9px] text-emerald-300/80 font-mono truncate">
-                1-Click OAuth • Real &amp; Demo Switching
-              </span>
+        <div className="sm:hidden w-full bg-gradient-to-r from-[#0c1638] via-[#09122c] to-[#0a1835] border-b border-emerald-500/40 px-3 py-2.5 flex flex-col gap-2 shadow-lg">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <span className="text-[11px] font-black text-white tracking-wide truncate">
+                  Deriv: Not Logged In
+                </span>
+                <span className="text-[9px] text-emerald-300/80 font-mono truncate">
+                  Connect your Deriv account to trade
+                </span>
+              </div>
             </div>
+
+            {/* App ID Chip Button */}
+            <button
+              type="button"
+              id="mobile-banner-appid-btn"
+              onClick={() => {
+                setTempAppId(appId || '1089');
+                setIsAppIdModalOpen(true);
+              }}
+              className="shrink-0 px-2 py-1 rounded-lg bg-slate-950/90 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 flex items-center gap-1 active:scale-95 shadow-sm"
+            >
+              <Shield className="w-3 h-3 text-emerald-400" />
+              <span>App ID: <strong className="text-white">{appId || '1089'}</strong></span>
+              <span className="text-cyan-400 text-[9px] underline">Edit</span>
+            </button>
           </div>
-          <button
-            id="mobile-banner-login-btn"
-            onClick={onOpenSettings}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/30 active:scale-95 transition-all border border-emerald-300"
-          >
-            <Wallet className="w-3.5 h-3.5 fill-slate-950" />
-            <span>Login Now →</span>
-          </button>
+
+          {/* Action Buttons: Prominent 1-Tap Login with Deriv & Settings */}
+          <div className="grid grid-cols-2 gap-2 pt-0.5">
+            <button
+              id="mobile-banner-login-btn"
+              type="button"
+              onClick={() => {
+                setIsAppIdModalOpen(true);
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/30 active:scale-95 transition-all border border-emerald-300 flex items-center justify-center gap-1.5"
+            >
+              <Wallet className="w-3.5 h-3.5 fill-slate-950 shrink-0" />
+              <span className="font-extrabold tracking-tight">Login with Deriv</span>
+              <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+            </button>
+
+            <button
+              id="mobile-banner-settings-btn"
+              type="button"
+              onClick={onOpenSettings}
+              className="w-full py-2.5 px-2 rounded-xl bg-slate-800/90 hover:bg-slate-750 text-slate-200 font-bold text-xs border border-slate-700 active:scale-95 transition-all flex items-center justify-center gap-1 font-mono shadow-sm"
+            >
+              <Key className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span>API Token / More</span>
+            </button>
+          </div>
         </div>
       ) : (
         /* Mobile Account Switcher Sub-Header (Visible only on < sm mobile screens) */
@@ -1113,7 +1203,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              You are currently logged in with operator credentials (<strong className="text-white">boyboy8076</strong>). Logging out will end your session and return you to the access login screen.
+              You are currently logged in with operator credentials (<strong className="text-white">{accountInfo?.email || localStorage.getItem('deriv_precision_auth_user') || 'Authorized Operator'}</strong>). Logging out will end your session and return you to the access login screen.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -1136,6 +1226,136 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Yes, Log Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Registered Deriv App ID Modal */}
+      {isAppIdModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-50 animate-fade-in text-left">
+          <div className="w-full max-w-md bg-slate-900 border border-emerald-500/40 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4 text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">Registered Deriv App ID</h3>
+                  <p className="text-[10px] text-slate-400 font-mono">Use your custom registered app</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAppIdModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              If you have already registered an app in Deriv (<a href="https://app.deriv.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline font-semibold">app.deriv.com/dashboard</a> or <a href="https://developers.deriv.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline font-semibold">api.deriv.com</a>), enter your App ID below:
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-mono font-bold text-emerald-400 flex items-center justify-between">
+                <span>REGISTERED APP ID:</span>
+                <span className="text-[10px] text-slate-400 font-sans">e.g. 61234 (not 1089)</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={tempAppId}
+                  onChange={(e) => setTempAppId(e.target.value)}
+                  placeholder="Enter your registered App ID"
+                  className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-emerald-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const clean = tempAppId.trim();
+                    if (!clean) return;
+                    if (onUpdateAppId) onUpdateAppId(clean);
+                    setAppIdSavedNotice(true);
+                    setTimeout(() => setAppIdSavedNotice(false), 2500);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs font-mono transition-colors shadow-sm"
+                >
+                  Save ID
+                </button>
+              </div>
+              {appIdSavedNotice && (
+                <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 pt-1">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Saved! Now using App ID {tempAppId.trim()}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Exact Redirect URL for Deriv Developer Dashboard */}
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-slate-400">YOUR OAUTH REDIRECT URL:</span>
+                <span className="text-cyan-400">Copy to Deriv Dashboard</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  readOnly
+                  value={currentRedirectUrl}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-mono text-[11px] truncate select-all"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      if (navigator?.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(currentRedirectUrl);
+                        setIsCopiedRedirect(true);
+                        setTimeout(() => setIsCopiedRedirect(false), 2500);
+                      }
+                    } catch {}
+                  }}
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-mono transition-colors flex items-center gap-1 border border-slate-700"
+                >
+                  {isCopiedRedirect ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{isCopiedRedirect ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <a
+                href={getDerivOAuthUrl(tempAppId.trim() || '1089', currentRedirectUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  const clean = tempAppId.trim() || '1089';
+                  if (onUpdateAppId) onUpdateAppId(clean);
+                }}
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm font-mono transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-300 text-center active:scale-[0.99]"
+              >
+                <Wallet className="w-4 h-4 fill-slate-950" />
+                <span>Open Deriv Login in New Tab ({tempAppId.trim() || '1089'})</span>
+                <ExternalLink className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+              </a>
+
+              <p className="text-[10px] text-slate-400 text-center font-mono">
+                🛡️ Opens in a new tab so this app never freezes or gets blocked inside the browser iframe.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAppIdModalOpen(false);
+                  onOpenSettings();
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-cyan-300 hover:text-white text-xs font-mono transition-colors flex items-center justify-center gap-2 border border-slate-700"
+              >
+                <Key className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Or Connect with Deriv API Token (1-Click &amp; Instant)</span>
               </button>
             </div>
           </div>

@@ -1606,11 +1606,6 @@ export default function App() {
             localStorage.setItem('limitless_auth_session', 'true');
           } catch {}
         }}
-        onLoginWithDeriv={() => {
-          const authUrl = getDerivOAuthUrl(appId);
-          window.location.href = authUrl;
-        }}
-        appId={appId}
       />
     );
   }
@@ -1641,6 +1636,23 @@ export default function App() {
         onLogout={handleAppLogout}
         savedAccounts={savedAccounts}
         onSelectAccount={handleSelectAccount}
+        appId={appId}
+        onUpdateAppId={(newId) => {
+          setAppId(newId);
+          setStoredAppId(newId);
+        }}
+        onLoginWithDeriv={(customAppId) => {
+          const idToUse = customAppId || appId;
+          setAppId(idToUse);
+          setStoredAppId(idToUse);
+          const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
+          const authUrl = getDerivOAuthUrl(idToUse, redirectUri);
+          try {
+            window.open(authUrl, '_blank', 'noopener,noreferrer');
+          } catch (e) {
+            console.warn('Failed to open window', e);
+          }
+        }}
       />
 
       {/* Main Container */}

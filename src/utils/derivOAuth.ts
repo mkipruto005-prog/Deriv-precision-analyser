@@ -213,9 +213,13 @@ export function extractDerivCredentials(rawInput: string): ExtractedCredentials 
 /**
  * Generates the official Deriv OAuth authorization URL
  */
-export function getDerivOAuthUrl(appId: string = '1089'): string {
-  const cleanAppId = (appId || '').trim() || '1089';
-  return `https://oauth.deriv.com/oauth2/authorize?app_id=${cleanAppId}&l=en`;
+export function getDerivOAuthUrl(appId?: string, redirectUri?: string): string {
+  const cleanAppId = (appId || '').trim() || getStoredAppId() || '1089';
+  const base = `https://oauth.deriv.com/oauth2/authorize?app_id=${cleanAppId}&l=en`;
+  if (redirectUri && redirectUri.trim()) {
+    return `${base}&redirect_uri=${encodeURIComponent(redirectUri.trim())}`;
+  }
+  return base;
 }
 
 /**
@@ -463,6 +467,8 @@ export function setStoredApiToken(token: string) {
 
 export function getStoredAppId(): string {
   try {
+    const envAppId = (import.meta as any)?.env?.VITE_DERIV_APP_ID;
+    if (envAppId && envAppId.trim()) return envAppId.trim();
     return localStorage.getItem(STORAGE_APP_ID_KEY) || '1089';
   } catch {
     return '1089';

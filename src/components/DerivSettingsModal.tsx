@@ -31,7 +31,8 @@ import {
   getDerivOAuthUrl, 
   extractDerivCredentials, 
   verifyDerivToken, 
-  TokenVerificationResult 
+  TokenVerificationResult,
+  setStoredAppId
 } from '../utils/derivOAuth';
 
 interface DerivSettingsModalProps {
@@ -91,6 +92,7 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
   const [diagnosticPing, setDiagnosticPing] = useState<number | null>(null);
   const [diagnosticStatus, setDiagnosticStatus] = useState<string>('Ready to test connection');
   const [isTestingPing, setIsTestingPing] = useState<boolean>(false);
+  const [appIdSavedToast, setAppIdSavedToast] = useState<boolean>(false);
 
   useEffect(() => {
     setApiToken(initialToken || '');
@@ -725,15 +727,106 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
         {/* TAB 1: DERIV OAUTH 2.0 (1-CLICK LOGIN) */}
         {activeTab === 'oauth' && (
           <div className="space-y-4">
+            {/* Registered App ID & Redirect URL Configuration Box */}
+            <div className="p-3.5 rounded-xl bg-slate-900 border border-emerald-500/35 space-y-2.5 shadow-inner">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5 font-mono">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Your Registered Deriv App ID</span>
+                </span>
+                {appId !== '1089' ? (
+                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    CUSTOM APP ID ACTIVE
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-mono text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                    DEFAULT (1089)
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                {/* App ID Input */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
+                    <span>APP ID (FROM DERIV):</span>
+                    <span className="text-emerald-400 font-sans">e.g. 61234 (not 1089)</span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={appId}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setAppId(val);
+                        setStoredAppId(val);
+                        onSaveConfig(val, apiToken);
+                      }}
+                      placeholder="Enter your registered App ID"
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono text-xs focus:border-emerald-400 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const clean = appId.trim();
+                        if (!clean) return;
+                        setStoredAppId(clean);
+                        onSaveConfig(clean, apiToken);
+                        setAppIdSavedToast(true);
+                        setTimeout(() => setAppIdSavedToast(false), 2500);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono transition-colors shadow-sm"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  {appIdSavedToast && (
+                    <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Saved! Using App ID {appId}
+                    </span>
+                  )}
+                </div>
+
+                {/* Redirect URL with 1-click Copy */}
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
+                    <span>OAUTH REDIRECT URL:</span>
+                    <span className="text-cyan-400 font-sans">Copy to dashboard</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      readOnly
+                      value={currentRedirectUrl}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800 text-slate-400 font-mono text-[11px] truncate select-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyRedirectUrl}
+                      className="shrink-0 px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-mono transition-colors flex items-center gap-1 border border-slate-700"
+                      title="Copy Redirect URL to clipboard"
+                    >
+                      {isCopiedRedirect ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{isCopiedRedirect ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-400 leading-tight">
+                💡 Paste this exact Redirect URL into your Deriv Developer Dashboard (<a href="https://app.deriv.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline font-semibold">app.deriv.com/dashboard</a> or <a href="https://developers.deriv.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline font-semibold">developers.deriv.com</a>) under your App ID.
+              </p>
+            </div>
+
             {/* OAuth Quick Connect Box */}
             <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-slate-900 border border-emerald-500/30 space-y-3.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-2">
                   <Globe className="w-4 h-4 text-emerald-400" />
-                  <span>Step 1: Official Deriv Sign-In (Recommended)</span>
+                  <span>Official Deriv OAuth Sign-In (Recommended)</span>
                 </span>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20">
-                  App ID: {appId}
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">
+                  Using App ID: {appId}
                 </span>
               </div>
 
@@ -764,31 +857,22 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
               </div>
 
               <div className="flex flex-col gap-2 pt-1">
-                {/* Primary Button: Direct Redirect (100% works on mobile and avoids popup blockers) */}
-                <button
-                  type="button"
+                {/* Primary Button: Open Deriv Authorization in New Tab (Prevents iframe crash) */}
+                <a
                   id="open-oauth-direct-redirect-btn"
-                  onClick={() => {
-                    const authUrl = getDerivOAuthUrl(appId);
-                    window.location.href = authUrl;
-                  }}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-mono font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 border border-emerald-300 active:scale-[0.99]"
+                  href={getDerivOAuthUrl(appId, currentRedirectUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-mono font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 border border-emerald-300 active:scale-[0.99] text-center"
                 >
                   <Globe className="w-4 h-4" />
-                  <span>Log In with Deriv.com (Direct Redirect)</span>
-                  <ArrowRight className="w-4 h-4 stroke-[3]" />
-                </button>
+                  <span>Log In with Deriv.com (Opens in New Tab)</span>
+                  <ExternalLink className="w-4 h-4 text-slate-950 shrink-0" />
+                </a>
 
-                {/* Secondary Button: Popup in new tab (Desktop alternative) */}
-                <button
-                  type="button"
-                  id="open-oauth-popup-btn"
-                  onClick={handleOAuthLoginPopup}
-                  className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-1.5 border border-slate-700"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Or Open in New Tab / Window</span>
-                </button>
+                <p className="text-[10px] text-slate-400 text-center font-mono">
+                  🛡️ Opens in a new tab so this app never crashes or gets blocked inside the browser iframe.
+                </p>
               </div>
             </div>
 
