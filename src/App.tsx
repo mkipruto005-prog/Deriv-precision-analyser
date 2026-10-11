@@ -227,7 +227,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('deriv_precision_auth_session') === 'true' || 
-             localStorage.getItem('limitless_auth_session') === 'true';
+             localStorage.getItem('limitless_auth_session') === 'true' ||
+             Boolean(localStorage.getItem('deriv_token')) ||
+             Boolean(localStorage.getItem('deriv_api_token'));
     }
     return false;
   });
@@ -256,8 +258,36 @@ export default function App() {
   const [apiToken, setApiToken] = useState<string>(() => getStoredApiToken());
   const apiTokenRef = useRef<string>(apiToken);
   apiTokenRef.current = apiToken;
-  const [savedAccounts, setSavedAccounts] = useState<DerivOAuthAccount[]>(() => getStoredOAuthAccounts());
-  const [accountInfo, setAccountInfo] = useState<DerivAccountInfo>({ isAuthorized: false });
+  const [savedAccounts, setSavedAccounts] = useState<DerivOAuthAccount[]>(() => {
+    const stored = getStoredOAuthAccounts();
+    if (stored && stored.length > 0) return stored;
+    if (typeof window !== 'undefined') {
+      const dToken = localStorage.getItem('deriv_token') || localStorage.getItem('deriv_api_token');
+      const dLoginId = localStorage.getItem('deriv_loginid');
+      if (dToken && dLoginId) {
+        return [{
+          account: dLoginId,
+          token: dToken,
+          currency: 'USD',
+          isVirtual: dLoginId.toUpperCase().startsWith('VRT')
+        }];
+      }
+    }
+    return [];
+  });
+  const [accountInfo, setAccountInfo] = useState<DerivAccountInfo>(() => {
+    if (typeof window !== 'undefined') {
+      const savedLoginId = localStorage.getItem('deriv_loginid');
+      if (savedLoginId) {
+        return {
+          isAuthorized: false,
+          loginid: savedLoginId,
+          isVirtual: savedLoginId.toUpperCase().startsWith('VRT')
+        };
+      }
+    }
+    return { isAuthorized: false };
+  });
   const [paperBalance, setPaperBalance] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('deriv_paper_balance');
@@ -325,6 +355,25 @@ export default function App() {
   // Check for Deriv OAuth redirect parameters on load (e.g. ?acct1=...&token1=... or #acct1=...)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // Homepage load handler as requested
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token1');
+    const loginid = params.get('acct1');
+
+    if (token) {
+      localStorage.setItem('deriv_token', token);
+      if (loginid) {
+        localStorage.setItem('deriv_loginid', loginid);
+      }
+      localStorage.setItem('deriv_api_token', token);
+      localStorage.setItem('deriv_precision_auth_session', 'true');
+      localStorage.setItem('limitless_auth_session', 'true');
+      console.log("Logged in as:", loginid);
+      window.history.replaceState({}, '', '/');
+      window.location.reload();
+      return;
+    }
 
     // Check if opened as a popup by our main window
     const rawSearch = window.location.search || window.location.hash;
@@ -1524,7 +1573,7 @@ export default function App() {
   };
 
   const handleSaveConfig = (newAppId: string, newApiToken: string) => {
-    const cleanAppId = newAppId.trim() || '1089';
+    const cleanAppId = newAppId.trim() || '34DUJAOpbp8lyBNT6Xu8Z';
     const cleanToken = newApiToken.trim();
     setAppId(cleanAppId);
     setApiToken(cleanToken);
@@ -1559,6 +1608,9 @@ export default function App() {
     try {
       localStorage.removeItem('deriv_precision_auth_session');
       localStorage.removeItem('limitless_auth_session');
+      localStorage.removeItem('deriv_token');
+      localStorage.removeItem('deriv_loginid');
+      localStorage.removeItem('deriv_api_token');
     } catch (e) {
       console.warn(e);
     }
@@ -1641,17 +1693,8 @@ export default function App() {
           setAppId(newId);
           setStoredAppId(newId);
         }}
-        onLoginWithDeriv={(customAppId) => {
-          const idToUse = customAppId || appId;
-          setAppId(idToUse);
-          setStoredAppId(idToUse);
-          const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
-          const authUrl = getDerivOAuthUrl(idToUse, redirectUri);
-          try {
-            window.open(authUrl, '_blank', 'noopener,noreferrer');
-          } catch (e) {
-            console.warn('Failed to open window', e);
-          }
+        onLoginWithDeriv={() => {
+          window.location.href = "https://oauth.deriv.com/oauth2/authorize?app_id=34DUJAOpbp8lyBNT6Xu8Z";
         }}
       />
 

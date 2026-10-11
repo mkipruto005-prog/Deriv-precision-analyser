@@ -107,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   savedAccounts = [],
   onSelectAccount,
-  appId = '1089',
+  appId = '34DUJAOpbp8lyBNT6Xu8Z',
   onUpdateAppId,
   onLoginWithDeriv
 }) => {
@@ -121,12 +121,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   // Quick App ID Modal states
   const [isAppIdModalOpen, setIsAppIdModalOpen] = useState(false);
-  const [tempAppId, setTempAppId] = useState(appId || '1089');
+  const [tempAppId, setTempAppId] = useState(appId || '34DUJAOpbp8lyBNT6Xu8Z');
   const [appIdSavedNotice, setAppIdSavedNotice] = useState(false);
   const [isCopiedRedirect, setIsCopiedRedirect] = useState(false);
 
   useEffect(() => {
-    setTempAppId(appId || '1089');
+    setTempAppId(appId || '34DUJAOpbp8lyBNT6Xu8Z');
   }, [appId]);
 
   const currentRedirectUrl = typeof window !== 'undefined'
@@ -651,24 +651,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 id="nav-app-id-btn"
                 type="button"
                 onClick={() => {
-                  setTempAppId(appId || '1089');
+                  setTempAppId(appId || '34DUJAOpbp8lyBNT6Xu8Z');
                   setIsAppIdModalOpen(true);
                 }}
                 className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-emerald-500/30 text-xs font-mono transition-colors shadow-sm"
-                title="Your registered Deriv App ID. Click to change."
+                title="Your registered Deriv App ID: 34DUJAOpbp8lyBNT6Xu8Z"
               >
                 <Shield className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-slate-400 text-[10px]">App ID:</span>
-                <span className="text-emerald-400 font-bold text-xs">{appId || '1089'}</span>
-                {appId && appId !== '1089' ? (
-                  <span className="text-[8px] bg-emerald-500 text-slate-950 px-1 rounded font-black">
-                    REGISTERED
-                  </span>
-                ) : (
-                  <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1 rounded font-semibold border border-amber-500/30">
-                    SET ID
-                  </span>
-                )}
+                <span className="text-emerald-400 font-bold text-xs truncate max-w-[120px]">{appId || '34DUJAOpbp8lyBNT6Xu8Z'}</span>
+                <span className="text-[8px] bg-emerald-500 text-slate-950 px-1 rounded font-black">
+                  REGISTERED
+                </span>
               </button>
 
               {/* Prominent Login with Deriv Button */}
@@ -676,14 +670,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 id="nav-link-deriv-btn"
                 type="button"
                 onClick={() => {
-                  setIsAppIdModalOpen(true);
+                  window.location.href = "https://oauth.deriv.com/oauth2/authorize?app_id=34DUJAOpbp8lyBNT6Xu8Z";
                 }}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs font-mono transition-all shrink-0 shadow-md shadow-emerald-500/25 active:scale-95 border border-emerald-300"
-                title={`Connect Deriv account (App ID: ${appId || '1089'})`}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs font-mono transition-all shrink-0 shadow-md shadow-emerald-500/25 active:scale-95 border border-emerald-300 cursor-pointer"
+                title="Log in with Deriv"
               >
                 <Wallet className="w-3.5 h-3.5 text-slate-950 fill-slate-950 shrink-0" />
                 <span className="whitespace-nowrap font-extrabold tracking-tight">Login with Deriv</span>
-                <ArrowRight className="w-3 h-3 text-slate-950 stroke-[3] hidden sm:inline" />
               </button>
             </div>
           )}
@@ -923,13 +916,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               id="mobile-banner-appid-btn"
               onClick={() => {
-                setTempAppId(appId || '1089');
+                setTempAppId(appId || '34DUJAOpbp8lyBNT6Xu8Z');
                 setIsAppIdModalOpen(true);
               }}
               className="shrink-0 px-2 py-1 rounded-lg bg-slate-950/90 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 flex items-center gap-1 active:scale-95 shadow-sm"
             >
               <Shield className="w-3 h-3 text-emerald-400" />
-              <span>App ID: <strong className="text-white">{appId || '1089'}</strong></span>
+              <span>App ID: <strong className="text-white truncate max-w-[100px]">{appId || '34DUJAOpbp8lyBNT6Xu8Z'}</strong></span>
               <span className="text-cyan-400 text-[9px] underline">Edit</span>
             </button>
           </div>
@@ -940,13 +933,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="mobile-banner-login-btn"
               type="button"
               onClick={() => {
-                setIsAppIdModalOpen(true);
+                window.location.href = "https://oauth.deriv.com/oauth2/authorize?app_id=34DUJAOpbp8lyBNT6Xu8Z";
               }}
-              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/30 active:scale-95 transition-all border border-emerald-300 flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/30 active:scale-95 transition-all border border-emerald-300 flex items-center justify-center gap-1.5 text-center cursor-pointer"
             >
               <Wallet className="w-3.5 h-3.5 fill-slate-950 shrink-0" />
               <span className="font-extrabold tracking-tight">Login with Deriv</span>
-              <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
             </button>
 
             <button
@@ -1327,20 +1319,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <div className="pt-2 flex flex-col gap-2">
-              <a
-                href={getDerivOAuthUrl(tempAppId.trim() || '1089', currentRedirectUrl)}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
                 onClick={() => {
-                  const clean = tempAppId.trim() || '1089';
-                  if (onUpdateAppId) onUpdateAppId(clean);
+                  window.location.href = "https://oauth.deriv.com/oauth2/authorize?app_id=34DUJAOpbp8lyBNT6Xu8Z";
                 }}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm font-mono transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-300 text-center active:scale-[0.99]"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm font-mono transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 border border-emerald-300 text-center active:scale-[0.99] cursor-pointer"
               >
                 <Wallet className="w-4 h-4 fill-slate-950" />
-                <span>Open Deriv Login in New Tab ({tempAppId.trim() || '1089'})</span>
-                <ExternalLink className="w-4 h-4 text-slate-950 stroke-[2.5]" />
-              </a>
+                <span>Log In with Deriv (34DUJAOpbp8lyBNT6Xu8Z)</span>
+              </button>
 
               <p className="text-[10px] text-slate-400 text-center font-mono">
                 🛡️ Opens in a new tab so this app never freezes or gets blocked inside the browser iframe.

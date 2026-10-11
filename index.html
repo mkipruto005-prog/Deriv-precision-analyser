@@ -12,6 +12,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Add this on Homepage load
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token1');
+      const loginid = params.get('acct1');
+
+      if(token){
+        localStorage.setItem('deriv_token', token);
+        if(loginid) {
+          localStorage.setItem('deriv_loginid', loginid);
+        }
+        localStorage.setItem('deriv_api_token', token);
+        localStorage.setItem('deriv_precision_auth_session', 'true');
+        localStorage.setItem('limitless_auth_session', 'true');
+        console.log("Logged in as:", loginid);
+        window.history.replaceState({}, '', '/');
+        window.location.reload();
+      }
+    </script>
   </head>
   <body class="bg-[#0a0c20] text-slate-100 overflow-x-hidden w-full m-0 p-0 selection:bg-cyan-500 selection:text-slate-950">
     <div id="root" class="w-full min-h-screen overflow-x-hidden"></div>

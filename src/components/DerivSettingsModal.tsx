@@ -70,7 +70,7 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
   currentSymbolName = 'Volatility 100 (1s) Index',
   authError = null
 }) => {
-  const [appId, setAppId] = useState(initialAppId || '1089');
+  const [appId, setAppId] = useState(initialAppId || '34DUJAOpbp8lyBNT6Xu8Z');
   const [apiToken, setApiToken] = useState(initialToken || '');
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<'oauth' | 'token' | 'diagnostics' | 'manage'>('oauth');
@@ -99,7 +99,7 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
   }, [initialToken]);
 
   useEffect(() => {
-    setAppId(initialAppId || '1089');
+    setAppId(initialAppId || '34DUJAOpbp8lyBNT6Xu8Z');
   }, [initialAppId]);
 
   // When authorized, default to manage tab
@@ -734,15 +734,9 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
                   <Shield className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Your Registered Deriv App ID</span>
                 </span>
-                {appId !== '1089' ? (
-                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    CUSTOM APP ID ACTIVE
-                  </span>
-                ) : (
-                  <span className="text-[9px] font-mono text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
-                    DEFAULT (1089)
-                  </span>
-                )}
+                <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  REGISTERED APP ID: {appId}
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -750,7 +744,7 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
                 <div className="space-y-1">
                   <label className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
                     <span>APP ID (FROM DERIV):</span>
-                    <span className="text-emerald-400 font-sans">e.g. 61234 (not 1089)</span>
+                    <span className="text-emerald-400 font-sans">Registered: 34DUJAOpbp8lyBNT6Xu8Z</span>
                   </label>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -857,18 +851,18 @@ export const DerivSettingsModal: React.FC<DerivSettingsModalProps> = ({
               </div>
 
               <div className="flex flex-col gap-2 pt-1">
-                {/* Primary Button: Open Deriv Authorization in New Tab (Prevents iframe crash) */}
-                <a
+                {/* Primary Button: Deriv Authorization */}
+                <button
+                  type="button"
                   id="open-oauth-direct-redirect-btn"
-                  href={getDerivOAuthUrl(appId, currentRedirectUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-mono font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 border border-emerald-300 active:scale-[0.99] text-center"
+                  onClick={() => {
+                    window.location.href = "https://oauth.deriv.com/oauth2/authorize?app_id=34DUJAOpbp8lyBNT6Xu8Z";
+                  }}
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 font-mono font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 border border-emerald-300 active:scale-[0.99] text-center cursor-pointer"
                 >
                   <Globe className="w-4 h-4" />
-                  <span>Log In with Deriv.com (Opens in New Tab)</span>
-                  <ExternalLink className="w-4 h-4 text-slate-950 shrink-0" />
-                </a>
+                  <span>Log In with Deriv.com</span>
+                </button>
 
                 <p className="text-[10px] text-slate-400 text-center font-mono">
                   🛡️ Opens in a new tab so this app never crashes or gets blocked inside the browser iframe.

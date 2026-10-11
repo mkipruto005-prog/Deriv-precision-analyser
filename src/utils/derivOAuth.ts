@@ -210,16 +210,15 @@ export function extractDerivCredentials(rawInput: string): ExtractedCredentials 
   };
 }
 
+export const DEFAULT_DERIV_APP_ID = '34DUJAOpbp8lyBNT6Xu8Z';
+export const DERIV_REGISTERED_OAUTH_URL = 'https://oauth.deriv.com/oauth2/authorize?app_id=34DUJAOpbp8lyBNT6Xu8Z';
+
 /**
- * Generates the official Deriv OAuth authorization URL
+ * Generates the official Deriv OAuth authorization URL.
+ * Set strictly to the user's registered Deriv OAuth link.
  */
-export function getDerivOAuthUrl(appId?: string, redirectUri?: string): string {
-  const cleanAppId = (appId || '').trim() || getStoredAppId() || '1089';
-  const base = `https://oauth.deriv.com/oauth2/authorize?app_id=${cleanAppId}&l=en`;
-  if (redirectUri && redirectUri.trim()) {
-    return `${base}&redirect_uri=${encodeURIComponent(redirectUri.trim())}`;
-  }
-  return base;
+export function getDerivOAuthUrl(_appId?: string, _redirectUri?: string): string {
+  return DERIV_REGISTERED_OAUTH_URL;
 }
 
 /**
@@ -236,9 +235,9 @@ const VERIFICATION_GATEWAYS = [
  * Verifies a Deriv API token in real-time by initiating an ephemeral TLS WebSocket connection
  * with multi-gateway failover and sending { authorize: token }.
  */
-export async function verifyDerivToken(token: string, appId: string = '1089'): Promise<TokenVerificationResult> {
+export async function verifyDerivToken(token: string, appId: string = DEFAULT_DERIV_APP_ID): Promise<TokenVerificationResult> {
   const cleanToken = (token || '').trim();
-  const cleanAppId = (appId || '').trim() || '1089';
+  const cleanAppId = (appId || '').trim() || DEFAULT_DERIV_APP_ID;
 
   if (!cleanToken) {
     return {
@@ -449,7 +448,7 @@ const STORAGE_ACCOUNTS_KEY = 'deriv_oauth_accounts';
 
 export function getStoredApiToken(): string {
   try {
-    return localStorage.getItem(STORAGE_TOKEN_KEY) || '';
+    return localStorage.getItem('deriv_token') || localStorage.getItem(STORAGE_TOKEN_KEY) || '';
   } catch {
     return '';
   }
@@ -458,9 +457,12 @@ export function getStoredApiToken(): string {
 export function setStoredApiToken(token: string) {
   try {
     if (token) {
+      localStorage.setItem('deriv_token', token.trim());
       localStorage.setItem(STORAGE_TOKEN_KEY, token.trim());
     } else {
+      localStorage.removeItem('deriv_token');
       localStorage.removeItem(STORAGE_TOKEN_KEY);
+      localStorage.removeItem('deriv_loginid');
     }
   } catch {}
 }
@@ -469,15 +471,19 @@ export function getStoredAppId(): string {
   try {
     const envAppId = (import.meta as any)?.env?.VITE_DERIV_APP_ID;
     if (envAppId && envAppId.trim()) return envAppId.trim();
-    return localStorage.getItem(STORAGE_APP_ID_KEY) || '1089';
+    const stored = localStorage.getItem(STORAGE_APP_ID_KEY);
+    if (stored && stored.trim() && stored !== '1089') {
+      return stored.trim();
+    }
+    return DEFAULT_DERIV_APP_ID;
   } catch {
-    return '1089';
+    return DEFAULT_DERIV_APP_ID;
   }
 }
 
 export function setStoredAppId(appId: string) {
   try {
-    localStorage.setItem(STORAGE_APP_ID_KEY, appId.trim() || '1089');
+    localStorage.setItem(STORAGE_APP_ID_KEY, appId.trim() || DEFAULT_DERIV_APP_ID);
   } catch {}
 }
 
